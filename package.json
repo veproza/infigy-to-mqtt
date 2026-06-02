@@ -1,0 +1,16 @@
+{
+  "name": "infigy-to-mqtt",
+  "version": "1.0.0",
+  "description": "",
+  "main": "infigy-to-mqtt.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mqtt": "^5.15.1",
+    "socket.io-client": "^4.8.3"
+  },
+  "type": "module"
+}
