@@ -58,4 +58,45 @@ export const controls = new Map([
         icon: 'mdi:battery-sync-outline',
         entity_category: 'config',
     }],
+
+    // --- Manual charge / discharge (Photovoltaics → battery controls) ---
+    // These require the PV_BATTERY / PV_BATTERY_CONTROL capabilities in the
+    // Infigy web app; on a system without a controllable battery they do nothing.
+
+    // "Manuálně nabít baterii" — while ON, force-charge the battery up to the
+    // target SoC below. Infigy switches it back OFF once the target is reached
+    // (or when you turn it off), so the state can change on its own.
+    ['SP_BATTERY_MANUAL_CHARGE', {
+        component: 'switch',
+        id: 'battery_manual_charge',
+        name: 'Manual Battery Charge',
+        icon: 'mdi:battery-charging',
+        entity_category: 'config',
+    }],
+
+    // "Cílové SOC pro manuální nabíjení" — target state of charge the manual
+    // charge above aims for. The app allows 20–100 %.
+    ['SP_BATTERY_MANUAL_CHARGE_SOC', {
+        component: 'number',
+        id: 'battery_manual_charge_soc',
+        name: 'Manual Charge Target SoC',
+        icon: 'mdi:battery-charging-100',
+        unit: '%',
+        min: 20,
+        max: 100,
+        step: 1,
+        mode: 'slider',
+        entity_category: 'config',
+    }],
+
+    // "Manuálně vybít baterii" — while ON, force-discharge the battery down to
+    // its minimum SoC. Infigy switches it back OFF when the minimum is reached
+    // (or when you turn it off).
+    ['SP_BATTERY_MANUAL_DISCHARGE', {
+        component: 'switch',
+        id: 'battery_manual_discharge',
+        name: 'Manual Battery Discharge',
+        icon: 'mdi:battery-minus-variant',
+        entity_category: 'config',
+    }],
 ]);
