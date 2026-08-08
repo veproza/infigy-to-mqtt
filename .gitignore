@@ -3,3 +3,7 @@
 node_modules
 *.log
 client.js
+
+# Your real Compose file, copied from compose.yaml.example (may contain credentials)
+compose.yaml
+docker-compose.yml

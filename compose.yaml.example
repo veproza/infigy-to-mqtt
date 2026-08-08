@@ -1,0 +1,22 @@
+# Example Docker Compose file for infigy-to-mqtt.
+# Copy this to compose.yaml (or docker-compose.yml) and fill in your values.
+#
+#   curl -O https://raw.githubusercontent.com/veproza/infigy-to-mqtt/main/compose.yaml.example
+#   cp compose.yaml.example compose.yaml
+#   docker compose up -d
+#
+# The image is built straight from the public GitHub repo — no need to clone it.
+
+services:
+  infigy-to-mqtt:
+    build: https://github.com/veproza/infigy-to-mqtt.git
+    container_name: infigy-to-mqtt
+    restart: unless-stopped
+    environment:
+      # Local IP of your Infigy box (find it in your router's DHCP table)
+      INFIGY_IP: 192.168.1.100
+      # Address of your MQTT broker (your Home Assistant IP if using the Mosquitto add-on)
+      MQTT_BROKER: mqtt://192.168.1.10
+      # MQTT credentials configured in your broker
+      MQTT_USERNAME: your_mqtt_username
+      MQTT_PASSWORD: your_mqtt_password
