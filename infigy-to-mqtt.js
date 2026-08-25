@@ -7,58 +7,94 @@ import { controls } from './controls.js';
 const DISCOVERY_PREFIX = 'homeassistant';
 const device = { identifiers: ['infigy'], name: 'Infigy' };
 
+// Home Assistant publishes its "birth" message here when it (re)starts.
+const HA_STATUS_TOPIC = `${DISCOVERY_PREFIX}/status`;
+
 const stateTopic = (id) => `infigy/${id}/state`;
 const commandTopic = (id) => `infigy/${id}/set`;
+// Bridge availability. HA marks every entity below unavailable when this reads
+// "offline" (set as the MQTT Last Will, and on a clean shutdown), and available
+// again on "online" — so entities track the bridge instead of going stale.
+const AVAILABILITY_TOPIC = 'infigy/status';
+
+// Publish the Home Assistant MQTT discovery config for every sensor and control.
+// Called both when the bridge connects and whenever HA comes back online (see
+// below), so the entities are re-announced after HA has restored its registry.
+function publishDiscovery(mqttClient) {
+    for (const [, sensor] of sensors) {
+        const config = Object.fromEntries(
+            Object.entries({
+                name: sensor.name,
+                device_class: sensor.device_class,
+                unit_of_measurement: sensor.unit,
+                state_topic: stateTopic(sensor.id),
+                availability_topic: AVAILABILITY_TOPIC,
+                unique_id: `infigy_${sensor.id}`,
+                state_class: sensor.state_class,
+                device,
+            }).filter(([, v]) => v != null)
+        );
+        mqttClient.publish(
+            `${DISCOVERY_PREFIX}/sensor/infigy_${sensor.id}/config`,
+            JSON.stringify(config),
+            { retain: true }
+        );
+    }
+    for (const [, control] of controls) {
+        const config = Object.fromEntries(
+            Object.entries({
+                name: control.name,
+                device_class: control.device_class,
+                unit_of_measurement: control.unit,
+                state_topic: stateTopic(control.id),
+                command_topic: commandTopic(control.id),
+                availability_topic: AVAILABILITY_TOPIC,
+                unique_id: `infigy_${control.id}`,
+                entity_category: control.entity_category,
+                icon: control.icon,
+                min: control.min,
+                max: control.max,
+                step: control.step,
+                mode: control.mode,
+                device,
+            }).filter(([, v]) => v != null)
+        );
+        mqttClient.publish(
+            `${DISCOVERY_PREFIX}/${control.component}/infigy_${control.id}/config`,
+            JSON.stringify(config),
+            { retain: true }
+        );
+    }
+}
 
 function connectMqtt() {
     return new Promise((resolve) => {
         console.log('Connecting to MQTT');
-        const mqttClient = mqtt.connect(MQTT_BROKER, { username: MQTT_USERNAME, password: MQTT_PASSWORD });
+        const mqttClient = mqtt.connect(MQTT_BROKER, {
+            username: MQTT_USERNAME,
+            password: MQTT_PASSWORD,
+            // If the bridge drops off the broker, HA is told the device is offline.
+            will: { topic: AVAILABILITY_TOPIC, payload: 'offline', retain: true, qos: 1 },
+        });
         mqttClient.on('connect', () => {
             console.log('MQTT connected');
-            for (const [, sensor] of sensors) {
-                const config = Object.fromEntries(
-                    Object.entries({
-                        name: sensor.name,
-                        device_class: sensor.device_class,
-                        unit_of_measurement: sensor.unit,
-                        state_topic: stateTopic(sensor.id),
-                        unique_id: `infigy_${sensor.id}`,
-                        state_class: sensor.state_class,
-                        device,
-                    }).filter(([, v]) => v != null)
-                );
-                mqttClient.publish(
-                    `${DISCOVERY_PREFIX}/sensor/infigy_${sensor.id}/config`,
-                    JSON.stringify(config),
-                    { retain: true }
-                );
-            }
+            mqttClient.publish(AVAILABILITY_TOPIC, 'online', { retain: true, qos: 1 });
+            publishDiscovery(mqttClient);
             for (const [, control] of controls) {
-                const config = Object.fromEntries(
-                    Object.entries({
-                        name: control.name,
-                        device_class: control.device_class,
-                        unit_of_measurement: control.unit,
-                        state_topic: stateTopic(control.id),
-                        command_topic: commandTopic(control.id),
-                        unique_id: `infigy_${control.id}`,
-                        entity_category: control.entity_category,
-                        icon: control.icon,
-                        min: control.min,
-                        max: control.max,
-                        step: control.step,
-                        mode: control.mode,
-                        device,
-                    }).filter(([, v]) => v != null)
-                );
-                mqttClient.publish(
-                    `${DISCOVERY_PREFIX}/${control.component}/infigy_${control.id}/config`,
-                    JSON.stringify(config),
-                    { retain: true }
-                );
                 mqttClient.subscribe(commandTopic(control.id));
             }
+            // Re-announce discovery when Home Assistant restarts. HA restores its
+            // entity registry and replays retained discovery at the same time; a
+            // message landing in that window can't be matched to the existing
+            // entity and spawns a `<entity>_2` duplicate. Re-publishing after HA's
+            // birth message ("online") ensures discovery arrives once HA is ready.
+            mqttClient.subscribe(HA_STATUS_TOPIC);
+            mqttClient.on('message', (topic, message) => {
+                if (topic === HA_STATUS_TOPIC && message.toString().trim().toLowerCase() === 'online') {
+                    console.log('Home Assistant is online — re-publishing discovery');
+                    publishDiscovery(mqttClient);
+                }
+            });
             resolve(mqttClient);
         });
         mqttClient.on('error', (err) => console.error('MQTT error', err));
@@ -147,7 +183,23 @@ async function main() {
         }
         const socket = connectInfigy(mqttSender);
         attachCommandHandler(mqttClient, socket);
+        setupGracefulShutdown(mqttClient);
     }
+}
+
+// On a clean stop (Ctrl-C, `docker stop` → SIGTERM) mark the bridge offline so
+// HA shows the entities unavailable straight away, then close the connection.
+function setupGracefulShutdown(mqttClient) {
+    let closing = false;
+    const shutdown = () => {
+        if (closing) return;
+        closing = true;
+        mqttClient.publish(AVAILABILITY_TOPIC, 'offline', { retain: true, qos: 1 }, () => {
+            mqttClient.end(false, {}, () => process.exit(0));
+        });
+    };
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
 }
 
 function connectInfigy(onDataReceived) {
