@@ -94,7 +94,7 @@ After a few seconds, the Infigy sensors will appear in Home Assistant under **Se
 
 ## Running with Docker (recommended)
 
-You can run the bridge as a container without installing Node.js — or even cloning this repo. The image is built straight from the public GitHub repository. Configuration is passed as environment variables.
+You can run the bridge as a container without installing Node.js — or even cloning this repo. A prebuilt image is published to the GitHub Container Registry, so Docker just pulls it. Configuration is passed as environment variables.
 
 ### 1. Get the example Compose file
 
@@ -105,15 +105,15 @@ cp compose.yaml.example compose.yaml
 
 ### 2. Configure
 
-Edit `compose.yaml` and set your Infigy IP, MQTT broker address, and MQTT credentials under `environment:`. The `build:` line already points at the GitHub repo, so there's nothing else to download.
+Edit `compose.yaml` and set your Infigy IP, MQTT broker address, and MQTT credentials under `environment:`. The `image:` line already points at the published image, so there's nothing to build.
 
-### 3. Build and run
+### 3. Pull and run
 
 ```bash
 docker compose up -d
 ```
 
-The container is set to `restart: unless-stopped`, so it comes back automatically after a crash or host reboot. To pick up a newer version later, rebuild with `docker compose build --pull --no-cache && docker compose up -d`.
+The container is set to `restart: unless-stopped`, so it comes back automatically after a crash or host reboot. To pick up a newer version later, run `docker compose pull && docker compose up -d`.
 
 ### 4. Check the logs
 
@@ -142,17 +142,23 @@ docker compose down      # stop and remove the container
 
 ### Running with plain Docker (without Compose)
 
-Build the image directly from the GitHub repo, then run it:
+Pull the published image and run it:
 
 ```bash
-docker build -t infigy-to-mqtt https://github.com/veproza/infigy-to-mqtt.git
-
 docker run -d --name infigy-to-mqtt --restart unless-stopped \
   -e INFIGY_IP=192.168.1.100 \
   -e MQTT_BROKER=mqtt://192.168.1.10 \
   -e MQTT_USERNAME=your_mqtt_username \
   -e MQTT_PASSWORD=your_mqtt_password \
-  infigy-to-mqtt
+  ghcr.io/veproza/infigy-to-mqtt:latest
+```
+
+### Building the image yourself
+
+If you'd rather build locally instead of pulling — e.g. you've cloned the repo and changed the sensor definitions — build from the working directory and point the Compose `image:` at your local tag (or use `build: .`):
+
+```bash
+docker build -t ghcr.io/veproza/infigy-to-mqtt:latest .
 ```
 
 ## Running automatically (without Docker)

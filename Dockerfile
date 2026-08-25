@@ -8,7 +8,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 # Copy the application source
-COPY infigy-to-mqtt.js sensors.js credentials.js ./
+COPY infigy-to-mqtt.js sensors.js controls.js credentials.js ./
 
 USER node
 

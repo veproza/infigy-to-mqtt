@@ -5,11 +5,12 @@
 #   cp compose.yaml.example compose.yaml
 #   docker compose up -d
 #
-# The image is built straight from the public GitHub repo — no need to clone it.
+# This pulls a prebuilt image straight from the GitHub Container Registry —
+# no need to clone the repo or build anything locally.
 
 services:
   infigy-to-mqtt:
-    build: https://github.com/veproza/infigy-to-mqtt.git
+    image: ghcr.io/veproza/infigy-to-mqtt:latest
     container_name: infigy-to-mqtt
     restart: unless-stopped
     environment:

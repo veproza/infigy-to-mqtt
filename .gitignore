@@ -2,7 +2,7 @@
 .idea
 node_modules
 *.log
-client.js
+client*.js
 
 # Your real Compose file, copied from compose.yaml.example (may contain credentials)
 compose.yaml
